@@ -1,0 +1,739 @@
+﻿@page "/socioeconomic/create/{patientID:int}"
+@using PM_Models.GeneInfo
+@using PM_Models.PatientModels
+@using PM_Models.SEA
+@using PM_Models.StageModels
+@using PM_Models.UserProfilesModels
+@using PM_Server.Business.Repositories.IRepo
+@using PM_Server.Components.GeneInfo
+@using PM_Server.Components.PatientComponents.Com
+
+@inject IJSRuntime _JSRuntime
+@inject NavigationManager _NavigationManager
+@inject AuthenticationStateProvider _Auth;
+@inject NotificationService _Notify;
+@inject ISEAssessment _SEA
+@inject IPatientRepo _patientRepo
+@inject INationalityRepo _nationalityRepo
+@inject ISurgeryRepo _surgeryRepo
+@inject IStatusRepo _statusRepo
+@inject IStageRepo _stageRepo
+@inject IUserProfileRepo _userProfileRepo
+@inject IScoreCalculateRepo _score
+@inject IScoreRepo _scoringRepo
+@inject IGeneInfo _geneInfo
+@inject IDialogService _dialogService
+@inject ISnackbar _snackBar
+
+<PageTitle>SocioEconomic Assessment</PageTitle>
+
+<MudAlert Severity="MudBlazor.Severity.Success">
+    <MudText Align="Align.Left" Color="Color.Success" Typo="Typo.body2" GutterBottom="true">SocioEconomic Assessment</MudText>
+    <MudText Align="Align.Left" Color="Color.Success" Typo="Typo.body2" GutterBottom="true">Please fill in the form below to add a new SocioEconomic Assessment</MudText>
+    <MudText Align="Align.Left" Color="Color.Success" Typo="Typo.body2" GutterBottom="true">Stages: @($"{previousStage.StageName} | {currentStage.StageName} | {nextStage.StageName}")</MudText>
+</MudAlert>
+<br />
+<MudCard>
+    <MudCardHeader>
+        <MudGrid Justify="Justify.FlexStart" Class="align-center">
+            <MudItem>
+                <MudText Typo="Typo.h6">SocioEconomic Assessment | @* | <span style="color:red; font-size:medium">Patient Name: @($"{Patient.FirstName} {Patient.MiddleName} {Patient.LastName}")</span> *@</MudText>
+            </MudItem>
+            <MudItem>
+                <MudText Color="Color.Error" Typo="Typo.body1">Patient Name: @($"{Patient.FirstName} {Patient.MiddleName} {Patient.LastName}")</MudText>
+            </MudItem>
+            <MudItem>
+                <MudText Typo="Typo.body2">| Status: In Progress</MudText>
+            </MudItem>
+        </MudGrid>
+    </MudCardHeader>
+
+    <MudCardContent>
+        <EditForm Model="@SEAssessment" OnValidSubmit="@SaveSEAssessment">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <RadzenTabs @bind-SelectedIndex=@selectedIndex>
+                <Tabs>
+                    <RadzenTabsItem Text="First">
+                        <div>
+                            <MudCard>
+                                @*Select input for the Nationality field*@
+                                <MudCardHeader>
+                                    <MudItem>
+                                        <MudText Typo="Typo.h6">Nationality</MudText>
+                                    </MudItem>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <div class="m-2">
+                                        <MudGrid Justify="Justify.SpaceBetween" Class="align-center">
+                                            <MudItem xs="9" sm="9" md="10" lg="11">
+                                                <MudSelect T="int" Label="Nationality" AnchorOrigin="Origin.CenterCenter" @bind-Value="SEAssessment.NationalityID">
+                                                    @foreach (var item in Nationalities)
+                                                    {
+                                                        <MudSelectItem Value="@item.Id">@item.NationalityName</MudSelectItem>
+                                                    }
+                                                </MudSelect>
+                                                <ValidationMessage For="@(() => SEAssessment.NationalityID)" />
+                                            </MudItem>
+                                            <MudItem>
+                                                @* Icon button to open mud dialog named EditNational and add other choices *@
+                                                <MudIconButton Size="Size.Medium" Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="()=>ShowNationalDialog()"></MudIconButton>
+                                            </MudItem>
+                                        </MudGrid>
+                                    </div>
+                                </MudCardContent>
+                                <MudCardHeader>
+                                    <MudItem>
+                                        <MudText Typo="Typo.h6">Employment Information</MudText>
+                                    </MudItem>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <div class="m-2">
+                                        <MudGrid Class="align-center">
+                                            <MudItem xs="12" sm="12" md="12" lg="12">
+                                                <div>
+                                                    <label class="form-label" for="EmploymentStatus">Employment Status</label>
+                                                    <div class="input-group">
+                                                        <InputSelect @bind-Value="SEAssessment.EmploymentStatus" @oninput="ChangeEmploymentStatus" class="form-select">
+                                                            <option disabled="disabled" value=@string.Empty>Select Employment Status</option>
+                                                            @foreach (var item in Scorings.Where(x => x.QuestionId == 1))
+                                                            {
+                                                                <option value="@item.Answer">@item.Answer</option>
+                                                            }
+                                                        </InputSelect>
+                                                        <span class="text-danger input-group-text">Score: @QuestionOneScore</span>
+                                                    </div>
+                                                    <ValidationMessage For="@(() => SEAssessment.EmploymentStatus)" />
+                                                </div>
+                                            </MudItem>
+                                            <MudItem xs="12" sm="12" md="12" lg="12">
+                                                <MudSelect T="string" Label="Occupation" @bind-Value="SEAssessment.Occupation" Variant="MudBlazor.Variant.Outlined" Dense="true">
+                                                    <MudSelectItem Disabled="true" Value="@("0")">Select Occupation</MudSelectItem>
+                                                    <MudSelectItem Value="@("Doctor")">Doctor</MudSelectItem>
+                                                    <MudSelectItem Value="@("Nurse")">Nurse</MudSelectItem>
+                                                    <MudSelectItem Value="@("Pharmacist")">Pharmacist</MudSelectItem>
+                                                    <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                                                </MudSelect>
+                                            </MudItem>
+                                            <MudItem xs="12" sm="12" md="12" lg="12">
+                                                <div>
+                                                    <label class="form-label" for="EmploymentType">Employment Type</label>
+                                                    <div class="input-group">
+                                                        <InputSelect @bind-Value="SEAssessment.EmploymentType" @oninput="ChangeEmploymentType" class="form-select">
+                                                            <option disabled="disabled" value=@string.Empty>Select Employment Type</option>
+                                                            @foreach (var item in Scorings.Where(x => x.QuestionId == 2))
+                                                            {
+                                                                <option value="@item.Answer">@item.Answer</option>
+                                                            }
+                                                        </InputSelect>
+                                                        <span class="text-danger input-group-text">Score: @QuestionTwoScore</span>
+                                                    </div>
+                                                    <ValidationMessage For="@(() => SEAssessment.EmploymentStatus)" />
+                                                </div>
+                                            </MudItem>
+                                            <br />
+                                            <MudItem xs="12" sm="12" md="6" lg="6">
+                                                <div>
+                                                    <label class="form-label" for="WorkingFamilyMembers">Working Family Members</label>
+                                                    <div class="input-group">
+                                                        <InputNumber @bind-Value="SEAssessment.WorkingFamilyMembers" @oninput="ChangeWorkingFamilyMembers" class="form-control" min="0" max="100" />
+                                                        <span class="text-danger input-group-text">Score: @QuestionThreeScore</span>
+                                                    </div>
+                                                    <ValidationMessage For="@(() => SEAssessment.WorkingFamilyMembers)" />
+                                                </div>
+                                            </MudItem>
+                                        </MudGrid>
+                                    </div>
+                                </MudCardContent>
+                                @*Income Information*@
+                                <MudCardHeader>
+                                    <MudItem>
+                                        <MudText Typo="Typo.h6">Income Information</MudText>
+                                    </MudItem>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <div class="m-2">
+                                        <MudGrid>
+                                            <MudItem xs="12" sm="12" md="6" lg="6">
+                                                <MudTextField T="decimal" Label="Monthly Income" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.MonthlyIncome"></MudTextField>
+                                            </MudItem>
+                                            <MudItem xs="12" sm="12" md="6" lg="6">
+                                                <MudSelect T="string" Label="Income Source" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.IncomeSource">
+                                                    <MudSelectItem Disabled="true" Value="@("0")">Select Income Source</MudSelectItem>
+                                                    <MudSelectItem Value="@("Salary")">Salary</MudSelectItem>
+                                                    <MudSelectItem Value="@("Business")">Business</MudSelectItem>
+                                                    <MudSelectItem Value="@("Investment")">Investment</MudSelectItem>
+                                                    <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                                                </MudSelect>
+                                            </MudItem>
+                                            <MudItem xs="12" sm="12" md="12" lg="12">
+                                                <MudAlert Severity="Severity.Normal" Variant="MudBlazor.Variant.Outlined" Dense="true" NoIcon="true">
+                                                    <MudRadioGroup @bind-Value="SEAssessment.AbilityToAffordEssentialNeeds">
+                                                        <MudText Typo="Typo.body2">The Ability To Afford Essential Needs</MudText>
+                                                        <MudRadio Value="true" Color="Color.Primary" Dense="true">Yes</MudRadio>
+                                                        <MudRadio Value="false" Color="Color.Secondary" Dense="false">No</MudRadio>
+                                                    </MudRadioGroup>
+                                                </MudAlert>
+                                            </MudItem>
+                                        </MudGrid>
+                                    </div>
+                                </MudCardContent>
+                                @*Income Information*@
+                                <MudCardHeader>
+                                    <MudItem>
+                                        <MudText Typo="Typo.h6">Education Information</MudText>
+                                    </MudItem>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <div class="m-2">
+                                        <MudGrid>
+                                            <MudItem xs="12" sm="12" md="6" lg="6">
+                                                <MudSelect T="string" Label="Education Level" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.EducationLevel">
+                                                    <MudSelectItem Disabled="true" Value="@("0")">Select Education Level</MudSelectItem>
+                                                    <MudSelectItem Value="@("Primary")">Primary</MudSelectItem>
+                                                    <MudSelectItem Value="@("Secondary")">Secondary</MudSelectItem>
+                                                    <MudSelectItem Value="@("Tertiary")">Tertiary</MudSelectItem>
+                                                    <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                                                </MudSelect>
+                                            </MudItem>
+                                            <MudItem xs="12" sm="12" md="6" lg="6">
+                                                <MudSelect T="string" Label="Education Status" Variant="MudBlazor.Variant.Outlined">
+                                                    <MudSelectItem Disabled="true" Value="@("0")">Select Education Status</MudSelectItem>
+                                                    <MudSelectItem Value="@("Completed")">Completed</MudSelectItem>
+                                                    <MudSelectItem Value="@("In-Progress")">In-Progress</MudSelectItem>
+                                                    <MudSelectItem Value="@("Not-Started")">Not-Started</MudSelectItem>
+                                                </MudSelect>
+                                            </MudItem>
+                                        </MudGrid>
+                                    </div>
+                                </MudCardContent>
+
+                            </MudCard>
+                        </div>
+                    </RadzenTabsItem>
+                    <RadzenTabsItem Text="Second">
+                        <MudCard>
+                            <MudCardHeader>
+                                <MudItem>
+                                    <MudText Typo="Typo.h6">Registration Information</MudText>
+                                </MudItem>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <div class="m-2">
+                                    <MudGrid>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudAlert Severity="Severity.Normal" Variant="MudBlazor.Variant.Outlined" Dense="true" NoIcon="true" Class="border-0">
+                                                <MudRadioGroup @bind-Value="SEAssessment.UNRWARegistered">
+                                                    <MudText Typo="Typo.body2">Registered With UNRWA</MudText>
+                                                    <MudRadio Value="true" Color="Color.Primary" Dense="true">Yes</MudRadio>
+                                                    <MudRadio Value="false" Color="Color.Secondary" Dense="false">No</MudRadio>
+                                                </MudRadioGroup>
+                                            </MudAlert>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudTextField Disabled="!SEAssessment.UNRWARegistered" T="string" Label="Registration Number" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.UNRWARegistrationNumber"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudAlert Severity="Severity.Normal" Variant="MudBlazor.Variant.Outlined" Dense="true" NoIcon="true" Class="border-0">
+                                                <MudRadioGroup @bind-Value="SEAssessment.UNCHRRegistered">
+                                                    <MudText Typo="Typo.body2">Registered With UNCHR</MudText>
+                                                    <MudRadio Value="true" Color="Color.Primary" Dense="true">Yes</MudRadio>
+                                                    <MudRadio Value="false" Color="Color.Secondary" Dense="false">No</MudRadio>
+                                                </MudRadioGroup>
+                                            </MudAlert>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudTextField Disabled="!SEAssessment.UNCHRRegistered" T="string" Label="Registration Number" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.UNCHRRegistrationNumber"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudAlert Severity="Severity.Normal" Variant="MudBlazor.Variant.Outlined" Dense="true" NoIcon="true" Class="border-0">
+                                                <MudRadioGroup @bind-Value="SEAssessment.MOSARegistered">
+                                                    <MudText Typo="Typo.body2">Registered With Ministry of Social Affairs</MudText>
+                                                    <MudRadio Value="true" Color="Color.Primary" Dense="true">Yes</MudRadio>
+                                                    <MudRadio Value="false" Color="Color.Secondary" Dense="false">No</MudRadio>
+                                                </MudRadioGroup>
+                                            </MudAlert>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudTextField Disabled="!SEAssessment.MOSARegistered" T="string" Label="Registration Number" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.MOSARegistrationNumber"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudAlert Severity="Severity.Normal" Variant="MudBlazor.Variant.Outlined" Dense="true" NoIcon="true" Class="border-0">
+                                                <MudRadioGroup @bind-Value="SEAssessment.OtherRegistered">
+                                                    <MudText Typo="Typo.body2">Registered With Other Agency</MudText>
+                                                    <MudRadio Value="true" Color="Color.Primary" Dense="true">Yes</MudRadio>
+                                                    <MudRadio Value="false" Color="Color.Secondary" Dense="false">No</MudRadio>
+                                                </MudRadioGroup>
+                                            </MudAlert>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudTextField Disabled="!SEAssessment.OtherRegistered" T="string" Label="Agency Name" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.OtherRegistrationName"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudTextField Disabled="!SEAssessment.OtherRegistered" T="string" Label="Registration Number" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.OtherRegistrationNumber"></MudTextField>
+                                        </MudItem>
+                                    </MudGrid>
+                                </div>
+                            </MudCardContent>
+                        </MudCard>
+                    </RadzenTabsItem>
+                    <RadzenTabsItem Text="Third">
+                        <MudCard>
+                            <MudCardHeader>
+                                <MudItem>
+                                    <MudText Typo="Typo.h6">Family Information</MudText>
+                                </MudItem>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <div class="m-2">
+                                    <MudGrid>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudSelect T="string" Variant="MudBlazor.Variant.Outlined" Label="Marital Status" @bind-Value="SEAssessment.MaritalStatus">
+                                                <MudSelectItem Disabled="true" Value="@("0")">Select Marital Status</MudSelectItem>
+                                                <MudSelectItem Value="@("Single")">Single</MudSelectItem>
+                                                <MudSelectItem Value="@("Married")">Married</MudSelectItem>
+                                                <MudSelectItem Value="@("Divorced")">Divorced</MudSelectItem>
+                                                <MudSelectItem Value="@("Widowed")">Widowed</MudSelectItem>
+                                            </MudSelect>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudTextField T="int" Label="Family Size" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.NumberOfFamilyMembers"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudTextField T="int" Label="Number of Children" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.NumberOfChildren"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudTextField T="int" Label="Number of Dependents" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.NumberOfDependents"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudAlert Severity="Severity.Normal" Variant="MudBlazor.Variant.Outlined" Dense="true" NoIcon="true">
+                                                <MudRadioGroup @bind-Value="SEAssessment.IsHeadOfHousehold">
+                                                    <MudText Typo="Typo.body2">The applicant is the head of the household</MudText>
+                                                    <MudRadio Value="true" Color="Color.Primary" Dense="true">Yes</MudRadio>
+                                                    <MudRadio Value="false" Color="Color.Secondary" Dense="false">No</MudRadio>
+                                                </MudRadioGroup>
+                                            </MudAlert>
+                                        </MudItem>
+                                    </MudGrid>
+                                </div>
+                            </MudCardContent>
+                        </MudCard>
+                    </RadzenTabsItem>
+                    <RadzenTabsItem Text="Fourth">
+                        <MudCard>
+                            <MudCardHeader>
+                                <MudItem>
+                                    <MudText Typo="Typo.h6">Disability Information</MudText>
+                                </MudItem>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <div class="m-2">
+                                    <MudGrid>
+                                        <MudItem xs="12" sm="12" md="12" lg="12">
+                                            <MudAlert Severity="Severity.Normal" Variant="MudBlazor.Variant.Outlined" Dense="true" NoIcon="true">
+                                                <MudRadioGroup @bind-Value="SEAssessment.HasDisability">
+                                                    <MudText Typo="Typo.body2">The applicant has a disability</MudText>
+                                                    <MudRadio Value="true" Color="Color.Primary" Dense="true">Yes</MudRadio>
+                                                    <MudRadio Value="false" Color="Color.Secondary" Dense="false">No</MudRadio>
+                                                </MudRadioGroup>
+                                            </MudAlert>
+                                        </MudItem>
+                                        <MudItem xs="9" sm="9" md="6" lg="6">
+                                            @*Multi Select Disability Type*@
+                                            <MudSelect T="string" MultiSelection="true" Label="Disability Type" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.DisabilityType">
+                                                <MudSelectItem Disabled="true" Value="@("0")">Select Disability Type</MudSelectItem>
+                                                <MudSelectItem Value="@("Physical")">Physical</MudSelectItem>
+                                                <MudSelectItem Value="@("Mental")">Mental</MudSelectItem>
+                                                <MudSelectItem Value="@("Hearing")">Hearing</MudSelectItem>
+                                                <MudSelectItem Value="@("Vision")">Vision</MudSelectItem>
+                                                <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                                            </MudSelect>
+                                        </MudItem>
+                                        <MudItem xs="3" sm="3" md="3" lg="3">
+                                            @*Icon button to add other choices*@
+                                            <MudIconButton Class="ma-2" Icon="@Icons.Material.Filled.Add" Color="Color.Primary" Size="Size.Medium" />
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudTextField T="string" Label="Disability Description" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.DisabilityDescription"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudSelect T="string" Label="Disability Severity" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.DisabilitySeverity">
+                                                <MudSelectItem Disabled="true" Value="@("0")">Select Disability Severity</MudSelectItem>
+                                                <MudSelectItem Value="@("Mild")">Mild</MudSelectItem>
+                                                <MudSelectItem Value="@("Moderate")">Moderate</MudSelectItem>
+                                                <MudSelectItem Value="@("Severe")">Severe</MudSelectItem>
+                                            </MudSelect>
+                                        </MudItem>
+                                    </MudGrid>
+                                </div>
+                            </MudCardContent>
+                        </MudCard>
+                    </RadzenTabsItem>
+                    <RadzenTabsItem Text="Five">
+                        <MudCard>
+                            <MudCardHeader>
+                                <MudItem>
+                                    <MudText Typo="Typo.h6">Housing Information</MudText>
+                                </MudItem>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <div class="m-2">
+                                    <MudGrid>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudSelect T="string" Label="Housing Status" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.HousingStatus">
+                                                <MudSelectItem Disabled="true" Value="@("0")">Select Housing Type</MudSelectItem>
+                                                <MudSelectItem Value="@("Owned")">Owned</MudSelectItem>
+                                                <MudSelectItem Value="@("Rented")">Rented</MudSelectItem>
+                                                <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                                            </MudSelect>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="6" lg="6">
+                                            <MudSelect T="string" Label="Housing Type" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.HousingType">
+                                                <MudSelectItem Disabled="true" Value="@("0")">Select Housing Type</MudSelectItem>
+                                                <MudSelectItem Value="@("Apartment")">Apartment</MudSelectItem>
+                                                <MudSelectItem Value="@("House")">House</MudSelectItem>
+                                                <MudSelectItem Value="@("Tent")">Tent</MudSelectItem>
+                                                <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                                            </MudSelect>
+                                        </MudItem>
+                                    </MudGrid>
+                                </div>
+                            </MudCardContent>
+                            <MudCardHeader>
+                                <MudItem>
+                                    <MudText Typo="Typo.h6">Insurance Information</MudText>
+                                </MudItem>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <div class="m-2">
+                                    <MudGrid>
+                                        <MudItem xs="12" sm="12" md="12" lg="12">
+                                            <MudAlert Severity="Severity.Normal" Variant="MudBlazor.Variant.Outlined" Dense="true" NoIcon="true">
+                                                <MudRadioGroup @bind-Value="SEAssessment.HasHealthInsurance">
+                                                    <MudText Typo="Typo.body2">The applicant has Health insurance</MudText>
+                                                    <MudRadio Value="true" Color="Color.Primary" Dense="true">Yes</MudRadio>
+                                                    <MudRadio Value="false" Color="Color.Secondary" Dense="false">No</MudRadio>
+                                                </MudRadioGroup>
+                                            </MudAlert>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="4" lg="4">
+                                            <MudSelect T="string" Label="Insurance Type" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.InsuranceType">
+                                                <MudSelectItem Disabled="true" Value="@("0")">Select Insurance Type</MudSelectItem>
+                                                <MudSelectItem Value="@("Public")">Public</MudSelectItem>
+                                                <MudSelectItem Value="@("Private")">Private</MudSelectItem>
+                                                <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                                            </MudSelect>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="4" lg="4">
+                                            <MudTextField T="string" Label="Insurance Company" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.InsuranceCompany"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="4" lg="4">
+                                            <MudTextField T="string" Label="Insurance Policy Number" Variant="MudBlazor.Variant.Outlined" @bind-Value="SEAssessment.InsurancePolicyNumber"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="12" md="12" lg="12">
+                                            <MudTextField T="string" Label="Comments" Variant="MudBlazor.Variant.Text" @bind-Value="SEAssessment.Comments" AutoGrow HelperText="Comments"></MudTextField>
+                                        </MudItem>
+                                    </MudGrid>
+                                </div>
+                            </MudCardContent>
+                        </MudCard>
+                    </RadzenTabsItem>
+                    <RadzenTabsItem Text="Six">
+                        <MudCard>
+                            <MudCardHeader>
+                                <MudItem>
+                                    <MudText Typo="Typo.h6">Surgery Information</MudText>
+                                </MudItem>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <div class="m-2">
+                                    <MudGrid>
+                                        <MudItem xs="9" sm="9" md="9" lg="9">
+                                            <MudSelect T="int" @bind-Value="SEAssessment.SurgeryId" Label="Surgery Required" Variant="MudBlazor.Variant.Outlined">
+                                                <MudSelectItem Disabled="true" Value="0">Select Surgery</MudSelectItem>
+                                                @foreach (var item in Surgeries)
+                                                {
+                                                    <MudSelectItem Value="@item.Id">@item.SurgeryName</MudSelectItem>
+                                                }
+                                            </MudSelect>
+                                        </MudItem>
+                                        <MudItem xs="3" sm="3" md="3" lg="3">
+                                            <MudIconButton Class="ma-2" Icon="@Icons.Material.Filled.Add" Color="Color.Primary" Size="Size.Medium" OnClick='() => _NavigationManager.NavigateTo("/surgery")'></MudIconButton>
+                                        </MudItem>
+                                        <MudItem xs="9" sm="9" md="9" lg="9">
+                                            <MudTextField T="string" Label="Additional Information" Variant="MudBlazor.Variant.Text" @bind-Value="SEAssessment.AdditionalInfo" AutoGrow></MudTextField>
+                                        </MudItem>
+                                    </MudGrid>
+                                </div>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudGrid Justify="Justify.FlexEnd">
+                                    <MudItem>
+                                        <button type="submit" class="btn btn-outline-primary" disabled="@IsLoading">Save</button>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudCardActions>
+                        </MudCard>
+                    </RadzenTabsItem>
+                </Tabs>
+            </RadzenTabs>
+        </EditForm>
+    </MudCardContent>
+    <MudCardActions>
+        <MudGrid Spacing="20">
+            <MudItem xs="10" sm="10" md="10" lg="10">
+                @if (selectedIndex > 0)
+                {
+                    <MudIconButton Size="Size.Large" Icon="@Icons.Material.Filled.KeyboardArrowLeft" Color="Color.Primary" OnClick='() => tabNavigation(2)'>Previous</MudIconButton>
+                }
+            </MudItem>
+            <MudItem>
+                @if (selectedIndex < 5)
+                {
+                    <MudIconButton Size="Size.Large" Icon="@Icons.Material.Filled.KeyboardArrowRight" Color="Color.Primary" OnClick='() => tabNavigation(1)'>Next</MudIconButton>
+                }
+            </MudItem>
+        </MudGrid>
+    </MudCardActions>
+</MudCard>
+
+
+@code {
+    [Parameter]
+    public int patientID { get; set; }
+    public PatientDTO Patient = new PatientDTO();
+
+    private SocioeconomicAssessmentDTO SEAssessment = new SocioeconomicAssessmentDTO();
+    private bool IsEdit = false;
+    private bool IsLoading = false;
+
+    // Get Current User
+    [CascadingParameter] public Task<AuthenticationState> Auth { get; set; }
+
+    // Get current user email
+    private string userEmail = string.Empty;
+    public async Task<string> GetUserEmail()
+    {
+        var authState = await Auth;
+        var user = authState.User;
+        userEmail = user.Identity.Name;
+        return userEmail;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await GetUserEmail();
+            await LoadPatient();
+            await LoadGeneralInfo();
+            await LoadRelatedUsers();
+        }
+    }
+
+
+
+    public async Task LoadPatient()
+    {
+        Patient = await _patientRepo.GetPatient(patientID);
+        StateHasChanged();
+    }
+
+
+    private async Task SaveSEAssessment()
+    {
+        // Get the current user
+        var authState = await _Auth.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        // Set Patient ID
+        SEAssessment.PatientID = patientID;
+
+        IsLoading = true;
+        if (IsEdit)
+        {
+            await _SEA.UpdateSEA(SEAssessment);
+        }
+        else
+        {
+            await _SEA.AddSEA(SEAssessment);
+
+            // Update the patient information
+            Patient.StageID = 2;
+            Patient.StatusID = 2;
+            await _patientRepo.UpdatePatient(Patient);
+
+            // Complete the previous stage
+            previousStage.StageStatusID = 3;
+            previousStage.ModifiedBy = user.Identity.Name;
+            previousStage.CompletionDate = DateTime.Now;
+            previousStage.StageColor = "success";
+            previousStage.StageStatus = Statuses?.FirstOrDefault(s => s.ID == 3)?.Status;
+            previousStage.IsCurrentStage = false;
+            previousStage.IsCompleted = true;
+            await _stageRepo.UpdateStage(previousStage);
+
+            // Update the current stage
+            currentStage.StageStatusID = 2;
+            currentStage.ModifiedBy = user.Identity.Name;
+            currentStage.StartDate = DateTime.Now;
+            currentStage.DueDate = DateTime.Now.AddDays(7);
+            currentStage.AssignedBy = user.Identity.Name;
+            currentStage.ActualStartDate = DateTime.Now;
+            currentStage.AssignedTo = user.Identity.Name;
+            currentStage.ActualAssignee = user.Identity.Name;
+            currentStage.StageColor = "success";
+            currentStage.StageStatus = Statuses?.FirstOrDefault(s => s.ID == 2)?.Status;
+            currentStage.IsCurrentStage = true;
+            currentStage.IsCompleted = false;
+            currentStage.IsNextStage = false;
+            await _stageRepo.UpdateStage(currentStage);
+
+            // Update the next stage
+            nextStage.StageStatusID = 1;
+            nextStage.IsNextStage = true;
+            nextStage.ModifiedBy = user.Identity.Name;
+            nextStage.StartDate = DateTime.Now.AddDays(7);
+            nextStage.DueDate = DateTime.Now.AddDays(14);
+            nextStage.StageColor = "warning";
+            nextStage.StageStatus = Statuses?.FirstOrDefault(s => s.ID == 1)?.Status;
+            nextStage.IsCurrentStage = false;
+            nextStage.IsCompleted = false;
+            await _stageRepo.UpdateStage(nextStage);
+
+        }
+        IsLoading = false;
+        _NavigationManager.NavigateTo($"/patientStages/{patientID}");
+        // Notify the user
+        _snackBar.Add("SocioEconomic Assessment has been saved successfully", Severity.Success);
+
+    }
+
+
+    // Taps
+    private int selectedIndex = 0;
+
+    private void tabNavigation(int button)
+    {
+        if (button == 1)
+        {
+            if (selectedIndex >= 0 && selectedIndex < 5)
+            {
+                selectedIndex++;
+            }
+        }
+        else if (button == 2)
+        {
+            if (selectedIndex > 0 && selectedIndex <= 5)
+            {
+                selectedIndex--;
+            }
+        }
+    }
+
+    // Load the General information (Nationality, Surgery Type, etc)
+
+    public IEnumerable<NationalityDTO> Nationalities { get; set; } = new List<NationalityDTO>();
+    public IEnumerable<SurgeryDTO> Surgeries { get; set; } = new List<SurgeryDTO>();
+    public IEnumerable<StageStatusDTO> Statuses { get; set; } = new List<StageStatusDTO>();
+    public IEnumerable<ScoringSystemDTO> Scorings { get; set; } = new List<ScoringSystemDTO>();
+
+    // Load the stages
+    public StageDTO previousStage = new StageDTO();
+    public StageDTO currentStage = new StageDTO();
+    public StageDTO nextStage = new StageDTO();
+
+    private async Task LoadGeneralInfo()
+    {
+        Nationalities = await _nationalityRepo.GetAllNationalities();
+        Surgeries = await _surgeryRepo.GetAllSurgeries();
+        Statuses = await _statusRepo.GetStatuses();
+        previousStage = await _stageRepo.GetStageByPatientAndOrder(patientID, 1);
+        currentStage = await _stageRepo.GetStageByPatientAndOrder(patientID, 2);
+        nextStage = await _stageRepo.GetStageByPatientAndOrder(patientID, 3);
+
+        Scorings = await _scoringRepo.GetScores();
+        StateHasChanged();
+    }
+
+    // Get the Assigned User
+    public UserProfileDTO AssignedTo = new UserProfileDTO();
+    public UserProfileDTO AssignedBy = new UserProfileDTO();
+    public IEnumerable<UserTypeDTO> UserTypes { get; set; } = new List<UserTypeDTO>();
+
+    private async Task LoadRelatedUsers()
+    {
+        UserTypes = await _userProfileRepo.GetUserTypes();
+        var medicals = await _userProfileRepo.GetUserByType("Medical Examiner");
+        if (medicals != null)
+        {
+            AssignedTo = medicals.FirstOrDefault();
+        }
+        else
+        {
+
+            AssignedTo = await _userProfileRepo.GetUserByEmail(userEmail);
+        }
+        AssignedBy = await _userProfileRepo.GetUserByEmail(userEmail);
+        StateHasChanged();
+    }
+
+
+    // Calculating the scores of the assessment questions
+    public int QuestionOneScore { get; set; }
+    private async Task ChangeEmploymentStatus(ChangeEventArgs args)
+    {
+        var changing = args.Value.ToString();
+        QuestionOneScore = await _score.CalculateScore(1, changing);
+    }
+
+    public int QuestionTwoScore { get; set; }
+    private async Task ChangeEmploymentType(ChangeEventArgs args)
+    {
+        var changing = args.Value.ToString();
+        QuestionTwoScore = await _score.CalculateScore(2, changing);
+    }
+
+    public int QuestionThreeScore { get; set; }
+    private async Task ChangeWorkingFamilyMembers(ChangeEventArgs args)
+    {
+        var changing = args.Value.ToString();
+        if (changing != null)
+        {
+            QuestionThreeScore = await _score.CalculateScore(3, changing);
+        }
+    }
+
+    // show Dialog EditNational
+    private async Task ShowNationalDialog()
+    {
+        var options = new MudBlazor.DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters<EditNational> { { X => X._PatientId, patientID } };
+
+        var dialog = _dialogService.Show<EditNational>("Simple Dialog", parameters, options);
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadGeneralInfo();
+        }
+    }
+
+    // Show Dialog EditEmploymentStatus
+    private async Task ShowEmploymentStatusDialog()
+    {
+        var options = new MudBlazor.DialogOptions { CloseOnEscapeKey = true };
+
+        var dialog = _dialogService.Show<EditEmploymentStatus>("Simple Dialog", options);
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadGeneralInfo();
+        }
+    }
+
+}

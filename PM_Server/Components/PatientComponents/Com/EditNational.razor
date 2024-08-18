@@ -1,0 +1,77 @@
+﻿@using AutoMapper
+@using PM_DataAccess.GeneInfo
+@using PM_Models.GeneInfo
+@using PM_Server.Data
+@inject ApplicationDbContext _context
+@inject IMapper _mapper 
+
+<MudDialog>
+    <TitleContent>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="nationality" FormName="ScorForm" OnValidSubmit="Save">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <MudGrid>
+                <MudItem xs="12" sm="12" md="12" lg="12">
+                    <MudText Typo="Typo.h6"> Add Nationality </MudText>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12" lg="12">
+                    <MudTextField Dense="true" Margin="Margin.Dense" Label="National Name" Variant="MudBlazor.Variant.Outlined" @bind-Value="nationality.NationalityName"></MudTextField>
+                    <ValidationMessage For="@(() => nationality.NationalityName)" />
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12" lg="12">
+
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12" lg="12">
+
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12" lg="12">
+
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12" lg="12" Style="">
+                    <MudGrid Justify="Justify.FlexEnd">
+                        <MudItem>
+                            <MudButton ButtonType="MudBlazor.ButtonType.Button" OnClick="Cancel">
+                                Cancel
+                            </MudButton>
+                        </MudItem>
+                        <MudItem>
+                            <MudButton ButtonType="MudBlazor.ButtonType.Submit" Variant="MudBlazor.Variant.Text" Color="Color.Primary">
+                                Save
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudItem>
+
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+@*     <DialogActions>
+                <MudButton OnClick="Cancel">Cancel</MudButton>
+                <MudButton Color="Color.Primary" OnClick="Save">Save</MudButton>
+    </DialogActions> *@
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; }
+
+    // Parameters
+    [Parameter]
+    public int _PatientId { get; set; }
+
+    public NationalityDTO nationality { get; set; } = new NationalityDTO();
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(true));
+
+    private void Cancel() => MudDialog.Cancel();
+
+    public async Task  Save()
+    {
+        var nationalityToAdd = _mapper.Map<NationalityDTO, Nationality>(nationality);
+        // Save the data
+        await _context.Nationalities.AddAsync(nationalityToAdd);
+        await _context.SaveChangesAsync();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

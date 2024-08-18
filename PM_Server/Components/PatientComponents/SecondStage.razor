@@ -1,0 +1,56 @@
+﻿@page "/SecondStage"
+@using PM_Models.PatientModels
+@using PM_Models.SEA
+@using PM_Server.Business.Repositories.IRepo
+
+@inject IPatientRepo _PatientRepo
+@inject ISEAssessment _SEA
+@inject IJSRuntime _jsRuntime
+
+<PageTitle>SecondStage</PageTitle>
+@*Table contains SEAs*@
+<table class="table">
+    <thead>
+        <tr>
+            <th>Id</th>
+            <th>PatientID</th>
+            <th>CreatedDate</th>
+            <th>NationalityID</th>
+            <th>Delete</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in seAssessment)
+        {
+            <tr>
+                <td>@item.Id</td>
+                <td>@item.PatientID </td>
+                <td>@item.CreatedDate</td>
+                <td>@item.NationalityID </td>
+                <td><button class="btn btn-danger" @onclick="() => Delete(item.Id)">Delete</button></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+
+@code {
+    public IEnumerable<SocioeconomicAssessmentDTO> seAssessment = new List<SocioeconomicAssessmentDTO>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        seAssessment = await _SEA.GetSEAs();
+    }
+
+    // Delete SEA with confirmation
+    private async Task Delete(int id)
+    {
+        var confirm = await _jsRuntime.InvokeAsync<bool>("confirm", "Are you sure?");
+        if (confirm)
+        {
+            await _SEA.DeleteSEA(id);
+            seAssessment = await _SEA.GetSEAs();
+        }
+    }
+}

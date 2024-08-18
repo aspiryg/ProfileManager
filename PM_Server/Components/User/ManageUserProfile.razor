@@ -1,0 +1,204 @@
+﻿@page "/ManageUserProfile"
+@using Microsoft.AspNetCore.Identity
+@using PM_Models.UserProfilesModels
+@using PM_Server.Business.Repositories
+@using PM_Server.Business.Repositories.IRepo
+
+@inject IUserProfileRepo _userProfileRepo
+@inject IUserTypeRepo _userTypeRepo
+@inject IJSRuntime _jsRuntime
+@inject NavigationManager _navigationManager;
+@inject AuthenticationStateProvider _Auth;
+@inject ISnackbar _snackBar;
+
+<PageTitle>Create Referrer</PageTitle>
+<div class="card justify-content-center">
+    <div class="card-header">
+        <div>
+            <MudBreadcrumbs Items="_items"></MudBreadcrumbs>
+        </div>
+    </div>
+    <div class="card-body col-lg-6">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">@(IsEdit ? "Edit" : "Create") My Profile</MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudIconButton Disabled="!IsEdit" OnClick="()=>EnableEditForm()" Icon="@Icons.Material.Filled.Settings" Color="Color.Default" />
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                <EditForm Model="@userProfile" OnValidSubmit="@SaveUserProfile">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    @*First Name*@
+                    <MudTextField @bind-Value="userProfile.FirstName"
+                                  For="@(() => userProfile.FirstName)"
+                                  Immediate="true"
+                                  Disabled="IsEdit"
+                                  Label="First Name" />
+                    @*Last Name*@
+                    <MudTextField @bind-Value="userProfile.LastName"
+                                  For="@(() => userProfile.LastName)"
+                                  Immediate="true"
+                                  Disabled="IsEdit"
+                                  Label="Last Name" />
+                    @*Meddle Name*@
+                    <MudTextField @bind-Value="userProfile.MiddleName"
+                                  For="@(() => userProfile.MiddleName)"
+                                  Immediate="true"
+                                  Disabled="IsEdit"
+                                  Label="Middle Name" />
+
+                    @*Email*@
+                    <MudTextField @bind-Value="userProfile.Email"
+                                  For="@(() => userProfile.Email)"
+                                  Immediate="true"
+                                  Label="Email" Disabled="true" />
+                    @*Phone*@
+                    <MudTextField @bind-Value="userProfile.Phone"
+                                  For="@(() => userProfile.Phone)"
+                                  Immediate="true"
+                                  Disabled="IsEdit"
+                                  Label="Phone" />
+                    @*Address*@
+                    <MudTextField @bind-Value="userProfile.Address"
+                                  For="@(() => userProfile.Address)"
+                                  Immediate="true"
+                                  Disabled="IsEdit"
+                                  Label="Address" />
+                    @*ZipCode*@
+                    <MudTextField @bind-Value="userProfile.ZipCode"
+                                  For="@(() => userProfile.ZipCode)"
+                                  Immediate="true"
+                                  Disabled="IsEdit"
+                                  Label="ZipCode" />
+                    @*City*@
+                    <MudTextField @bind-Value="userProfile.City"
+                                  For="@(() => userProfile.City)"
+                                  Immediate="true"
+                                  Disabled="IsEdit"
+                                  Label="City" />
+                    @*State*@
+                    <MudTextField @bind-Value="userProfile.State"
+                                  For="@(() => userProfile.State)"
+                                  Immediate="true"
+                                  Disabled="IsEdit"
+                                  Label="State" />
+                    @*Country*@
+                    <MudTextField @bind-Value="userProfile.Country"
+                                  For="@(() => userProfile.Country)"
+                                  Immediate="true"
+                                  Disabled="IsEdit"
+                                  Label="Country" />
+                    @*User Type*@
+                    <MudSelect T="string" @bind-Value="userProfile.UserType" Disabled="IsEdit"
+                               Label="User Type" AnchorOrigin="Origin.BottomCenter" AdornmentIcon="@Icons.Material.Filled.Groups2" AdornmentColor="Color.Primary">
+                        @foreach (var item in UserTypes)
+                        {
+                            <MudSelectItem Value="@(item.Type)" />
+                        }
+                    </MudSelect>
+                    <br />
+                    @*Buttons*@
+                    <div class="d-flex justify-content-end">
+                        <div class="">
+                            <button disabled="@IsEdit" type="submit" class="btn btn-primary">Save</button>
+                            <button disabled="@(IsEdit)" type="button" class="btn btn-secondary" @onclick="() => EnableEditForm()">Cancel</button>
+                            <button type="button" class="btn btn-danger" @onclick="()=>DeleteUserProfile(userProfile.ID)">Delete</button>
+                        </div>
+                    </div>
+                </EditForm>
+            </MudCardContent>
+        </MudCard>
+
+    </div>
+
+</div>
+
+@code {
+    public UserProfileDTO userProfile { get; set; } = new UserProfileDTO();
+    public IEnumerable<UserTypeDTO> UserTypes { get; set; } = new List<UserTypeDTO>();
+    public bool IsEdit { get; set; } = false;
+
+    // Enable the EditForm
+    void EnableEditForm()
+    {
+        IsEdit = !IsEdit;
+    }
+
+    // Get the userProfile
+    private async Task GetUserProfile()
+    {
+        StateHasChanged();
+        var user = (await _Auth.GetAuthenticationStateAsync()).User;
+        var email = user.Identity.Name;
+        userProfile = await _userProfileRepo.GetUserByEmail(email);
+        userProfile.Email = email;
+        if (userProfile.FirstName != string.Empty)
+        {
+            IsEdit = true;
+        }
+        StateHasChanged();
+    }
+
+    // Get userTypes
+    private async Task GetUserTypes()
+    {
+        UserTypes = await _userTypeRepo.GetUserTypes();
+    }
+
+    // Override OnAfterRenderAsync
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await GetUserProfile();
+            await GetUserTypes();
+        }
+    }
+
+    // Save the userProfile
+    private async Task SaveUserProfile()
+    {
+        // Either Create or Update
+        if (IsEdit)
+        {
+            await _userProfileRepo.UpdateUserProfile(userProfile);
+        }
+        else
+        {
+            await _userProfileRepo.CreateUserProfile(userProfile);
+        }
+        await GetUserProfile();
+        IsEdit = true;
+        _snackBar.Add("User Profile Saved", Severity.Success);
+    }
+
+    // Notification from Radzen
+    void Notify(NotificationMessage message)
+    {
+        _snackBar.Add(message.Summary, Severity.Error);
+    }
+
+
+    // Delete the userProfile
+    private async Task DeleteUserProfile(int id)
+    {
+        await _userProfileRepo.RemoveUser(id);
+        // await _jsRuntime.InvokeVoidAsync("location.reload");
+        await GetUserProfile();
+        _snackBar.Add("User Profile Deleted", Severity.Error);
+    }
+
+
+
+    // BreadcrumbItems
+    private List<BreadcrumbItem> _items = new List<BreadcrumbItem>
+    {
+        new BreadcrumbItem("Home", href: "#", icon: Icons.Material.Filled.Home),
+        new BreadcrumbItem("Profile", href: "#", icon: Icons.Material.Filled.VerifiedUser),
+        new BreadcrumbItem("Edit", href: null, disabled: true, icon: Icons.Material.Filled.Edit)
+    };
+}

@@ -1,0 +1,147 @@
+﻿@using PM_Models.GeneInfo
+@using PM_Models.SEA
+@using PM_Server.Business.Repositories.IRepo
+
+@inject IScoreRepo _ScoringRepo
+@inject NotificationService _Notify
+@inject IGeneInfo _GeneInfo
+
+
+
+<MudDialog>
+    <TitleContent>
+        Add Scoring Algorithm
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="Score" FormName="ScorForm" OnValidSubmit="Save">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <MudGrid>
+                <MudItem xs="12" sm="12" md="12" lg="12">
+                    <MudText Typo="Typo.h6">@questionPassed | Case @caseCount </MudText>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12" lg="12">
+                    <MudSelect Dense="true" Margin="Margin.Dense" T="string" Label="Question Type" Variant="MudBlazor.Variant.Outlined" @bind-Value="Score.QuestionType">
+                        <MudSelectItem Disabled="true" Value=@("0")>Select a type</MudSelectItem>
+                        <MudSelectItem Value=@("Choices")>Choices</MudSelectItem>
+                        <MudSelectItem Value=@("Binary")>Binary</MudSelectItem>
+                        <MudSelectItem Value=@("Number")>Number</MudSelectItem>
+                    </MudSelect>
+                    <ValidationMessage For="@(() => Score.QuestionType)" />
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12" lg="12">
+                    <MudSelect Dense="true" Margin="Margin.Dense" T="string" Label="Operator" Variant="MudBlazor.Variant.Outlined" @bind-Value="Score.Oprator">
+                        <MudSelectItem Value=@("Equal")>Equal</MudSelectItem>
+                        <MudSelectItem Value=@("NotEqual")>Not Equal</MudSelectItem>
+                        <MudSelectItem Value=@("GreaterThan")>Greater Than</MudSelectItem>
+                        <MudSelectItem Value=@("LessThan")>Less Than</MudSelectItem>
+                        <MudSelectItem Value=@("GreaterThanOrEqual")>Greater Than or Equal</MudSelectItem>
+                        <MudSelectItem Value=@("LessThanOrEqual")>Less Than or Equal</MudSelectItem>
+                    </MudSelect>
+                    <ValidationMessage For="@(() => Score.Oprator)" />
+                </MudItem>
+                @if (questionId == 1)
+                {
+                    <MudItem xs="12" sm="12" md="12" lg="12">
+                        <MudSelect Dense="true" Margin="Margin.Dense" T="string" Label="Answer" Variant="MudBlazor.Variant.Outlined" @bind-Value="Score.Answer">
+                            @foreach (var item in EmploymentStatuses)
+                            {
+                                <MudSelectItem Value=@(item.Name)>@item.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <ValidationMessage For="@(() => Score.Answer)" />
+                    </MudItem>
+                } else
+                {
+                    <MudItem xs="12" sm="12" md="12" lg="12">
+                        <MudTextField Dense="true" Margin="Margin.Dense" Label="Answer" Variant="MudBlazor.Variant.Outlined" @bind-Value="Score.Answer" />
+                        <ValidationMessage For="@(() => Score.Answer)" />
+                    </MudItem>
+                }
+                <MudItem xs="12" sm="12" md="12" lg="12">
+                    <MudTextField Dense="true" Margin="Margin.Dense" Label="Score" Variant="MudBlazor.Variant.Outlined" @bind-Value="Score.Score" />
+                    <ValidationMessage For="@(() => Score.Score)" />
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12" lg="12" Style="">
+                    <MudGrid Justify="Justify.FlexEnd">
+                        <MudItem>
+                            <MudButton ButtonType="MudBlazor.ButtonType.Button" OnClick="Cancel">
+                                Cancel
+                            </MudButton>
+                        </MudItem>
+                        <MudItem>
+                            <MudButton ButtonType="MudBlazor.ButtonType.Submit" Variant="MudBlazor.Variant.Text" Color="Color.Primary">
+                                Save
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudItem>
+
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        @*         <MudButton OnClick="Cancel">Cancel</MudButton> *@
+        @*         <MudButton Color="Color.Primary" OnClick="Save">Save</MudButton> *@
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; }
+
+    public IEnumerable<EmploymentStatusDTO> EmploymentStatuses = new List<EmploymentStatusDTO>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmpStatuses();
+    }
+
+    // load the employment status
+    private async Task LoadEmpStatuses()
+    {
+        EmploymentStatuses = await _GeneInfo.GetAllEmpStatus();
+
+        // exclude the item that are already in scoring system
+
+        var answer = await _ScoringRepo.GetScores();
+        foreach (var item in answer)
+        {
+            EmploymentStatuses = EmploymentStatuses.Where(x => x.Name != item.Answer);
+        }
+    }
+
+    // Parameters
+    [Parameter]
+    public string questionPassed { get; set; }
+
+    [Parameter]
+    public int caseCount { get; set; }
+
+    [Parameter]
+    public int questionId { get; set; }
+
+    // form name
+    private EditForm ScorForm;
+
+
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(true));
+
+    private void Cancel() => MudDialog.Cancel();
+
+    // scoring system
+    public ScoringSystemDTO Score = new ScoringSystemDTO();
+
+    // Save the Scoring System
+    private async Task Save()
+    {
+        Score.Question = questionPassed;
+        Score.QuestionId = questionId;
+        Score.CaseId = caseCount;
+        await _ScoringRepo.CreateScore(Score);
+        _Notify.Notify(NotificationSeverity.Success, "Success", "Scoring System Saved Successfully");
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+
+}

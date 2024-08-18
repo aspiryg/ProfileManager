@@ -1,0 +1,25 @@
+﻿
+@using PM_Models.PatientModels
+@using PM_Models.SEA
+@using PM_Server.Business.Repositories.IRepo
+
+@inject IPatientRepo _PatientRepo
+@inject ISEAssessment _SEA
+
+
+
+
+<PageTitle>PatientFirstStage</PageTitle>
+
+@code {
+
+    public int PatientId { get; set; }
+    
+    public SocioeconomicAssessmentDTO seAssessment = new SocioeconomicAssessmentDTO();
+    private PatientDTO Patient = new PatientDTO();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Patient = await _PatientRepo.GetPatient(PatientId);
+    }
+}

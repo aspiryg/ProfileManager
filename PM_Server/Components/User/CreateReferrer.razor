@@ -1,0 +1,80 @@
+﻿@page "/CreateReferrer"
+@using PM_Models.ReferrerModels
+@using PM_Server.Business.Repositories
+@using PM_Server.Business.Repositories.IRepo
+
+@inject IReferrerRepo _referrerRepo
+@inject IJSRuntime _jsRuntime
+@inject NavigationManager _navigationManager;
+
+<PageTitle>Create Referrer</PageTitle>
+<MudCard>
+    <EditForm Model="@referrer" OnValidSubmit="@SaveReferrer">
+        <DataAnnotationsValidator />
+        <MudCardContent>
+            <MudTextField @bind-Value="referrer.FirstName"
+                          For="@(() => referrer.FirstName)"
+                          Immediate="true"
+                          Label="First Name" />
+
+            <MudTextField @bind-Value="referrer.LastName"
+                          For="@(() => referrer.LastName)"
+                          Immediate="true"
+                          Label="Last Name" />
+
+            <MudTextField @bind-Value="referrer.Phone"
+                          For="@(() => referrer.Phone)"
+                          Immediate="true"
+                          Label="Phone Number" />
+
+            <MudTextField @bind-Value="referrer.Email"
+                          For="@(() => referrer.Email)"
+                          Immediate="true"
+                          Label="Email" />
+
+
+            <MudTextField @bind-Value="referrer.Address"
+                          For="@(() => referrer.Address)"
+                          Immediate="true"
+                          Label="Address" />
+
+            <MudTextField @bind-Value="referrer.ZipCode"
+                          For="@(() => referrer.ZipCode)"
+                          Immediate="true"
+                          Label="Postal Code" />
+
+            <MudTextField @bind-Value="referrer.City"
+                          For="@(() => referrer.City)"
+                          Immediate="true"
+                          Label="City" />
+
+            <MudTextField @bind-Value="referrer.State"
+                          For="@(() => referrer.State)"
+                          Immediate="true"
+                          Label="State" />
+
+            <MudTextField @bind-Value="referrer.Country"
+                          For="@(() => referrer.Country)"
+                          Immediate="true"
+                          Label="Country" />
+        </MudCardContent>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </EditForm>
+</MudCard>
+
+@code {
+    // 
+
+    // The Referrer
+    public ReferrerDTO referrer { get; set; } = new ReferrerDTO();
+
+    MudForm form;
+
+
+    // The SaveReferrer method
+    private async Task SaveReferrer()
+    {
+        await _referrerRepo.CreateReferrer(referrer);
+        referrer = new ReferrerDTO();
+    }
+}

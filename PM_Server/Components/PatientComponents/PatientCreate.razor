@@ -1,0 +1,276 @@
+﻿@page "/patients/create"
+@page "/patients/edit/{PatientID:int}"
+@using PM_Models.PatientModels
+@using PM_Models.StageModels
+@using PM_Server.Business.Repositories.IRepo
+
+@inject IPatientRepo _PatientRepo
+@inject IStageRepo _StageRepo
+@inject IStatusRepo _StatusRepo
+@inject IJSRuntime _jsRuntime
+@inject NavigationManager _navigationManager;
+@inject AuthenticationStateProvider _Auth;
+@inject NotificationService _Notify;
+
+
+<PageTitle>@(IsEdit ? "Update" : "Add") Patient</PageTitle>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title d-inline-block">@(IsEdit ? "Update" : "Add") Patient</h5>
+    </div>
+    <div class="card-body">
+        <EditForm Model="patient" OnValidSubmit="@SavePatient" FormName="Name">
+            <DataAnnotationsValidator />
+            @*First Name*@
+            <div class="form-group">
+                <label class="form-label" for="FirstName">First Name</label>
+                <InputText id="FirstName" class="form-control" @bind-Value="patient.FirstName" />
+                <ValidationMessage For="@(() => patient.FirstName)" />
+            </div>
+            <br />
+            @*Meddle Name*@
+            <div class="form-group">
+                <label class="form-label" for="MiddleName">Middle Name</label>
+                <InputText id="MiddleName" class="form-control" @bind-Value="patient.MiddleName" />
+                <ValidationMessage For="@(() => patient.MiddleName)" />
+            </div>
+            <br />
+            @*Last Name*@
+            <div class="form-group">
+                <label class="form-label" for="LastName">Last Name</label>
+                <InputText id="LastName" class="form-control" @bind-Value="patient.LastName" />
+                <ValidationMessage For="@(() => patient.LastName)" />
+            </div>
+            <br />
+            @*Date of Birth*@
+            @*             <div class="form-group">
+            <label class="form-label accordion-body" for="DateOfBirth">Date of Birth</label>
+            <InputDate id="DateOfBirth" class="form-control" @bind-Value="patient.DOB" />
+            <ValidationMessage For="@(() => patient.DOB)" />
+            </div>
+            <br /> *@
+            @*Radzen Date of Birth field*@
+            <div class="form-group accordion-body">
+                <label class="form-label" for="DateOfBirth">Date of Birth</label>
+                <RadzenDatePicker id="DateOfBirth" @bind-Value="patient.DOB" />
+                <ValidationMessage For="@(() => patient.DOB)" />
+            </div>
+            <br />
+
+            @*Patient Address Line 1*@
+            <div class="form-group">
+                <label class="form-label d-block" for="Address">Address Line 1</label>
+                <InputText id="Address" class="form-control" @bind-Value="patient.AddressLine1" />
+                <ValidationMessage For="@(() => patient.AddressLine1)" />
+            </div>
+            <br />
+            @*Patient Address Line 2*@
+            <div class="form-group">
+                <label class="form-label d-block" for="Address">Address Line 2</label>
+                <InputText id="Address" class="form-control" @bind-Value="patient.AddressLine2" />
+                <ValidationMessage For="@(() => patient.AddressLine2)" />
+            </div>
+            <br />
+            @*Patient City*@
+            <div class="form-group ">
+                <label class="form-label d-block" for="City">City</label>
+                <InputText id="City" class="form-control" @bind-Value="patient.City" />
+                <ValidationMessage For="@(() => patient.City)" />
+            </div>
+            <br />
+            @*Patient State*@
+            <div class="form-group">
+                <label class="form-label d-block" for="State">State</label>
+                <InputText id="State" class="form-control" @bind-Value="patient.State" />
+                <ValidationMessage For="@(() => patient.State)" />
+            </div>
+            <br />
+            @*Patient Zip Code*@
+            <div class="form-group">
+                <label class="form-label d-block" for="ZipCode">Zip Code</label>
+                <InputText id="ZipCode" class="form-control" @bind-Value="patient.ZipCode" />
+                <ValidationMessage For="@(() => patient.ZipCode)" />
+            </div>
+            <br />
+            @*Patient Country*@
+            <div class="form-group">
+                <label class="form-label d-block" for="Country">Country</label>
+                <InputText id="Country" class="form-control" @bind-Value="patient.Country" />
+                <ValidationMessage For="@(() => patient.Country)" />
+            </div>
+            <br />
+
+            @*Patient Phone Number*@
+            <div class="form-group">
+                <label class="form-label d-block" for="PhoneNumber">Phone Number</label>
+                <InputText id="PhoneNumber" class="form-control" @bind-Value="patient.PhoneNumber" />
+                <ValidationMessage For="@(() => patient.PhoneNumber)" />
+            </div>
+            <br />
+            @*Patient Email*@
+            <div class="form-group">
+                <label class="form-label" for="Email">Email</label>
+                <InputText id="Email" class="form-control" @bind-Value="patient.Email" />
+                <ValidationMessage For="@(() => patient.Email)" />
+            </div>
+            <br />
+            <div class="d-flex justify-content-end">
+                <div class="btn-group">
+                    @*Submit Button on the lift*@
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                    @*Cancel Button on the right*@
+                    <button type="button" class="btn btn-danger" @onclick='() => _navigationManager.NavigateTo("/patients")'>Cancel</button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+@code {
+    [Parameter]
+    public int PatientID { get; set; }
+    public bool IsEdit { get; set; } = false;
+
+    // Create a new patient object
+    public PatientDTO patient { get; set; } = new PatientDTO();
+
+    // List of all stage types
+    public IEnumerable<StageTypeDTO> stageTypes { get; set; } = new List<StageTypeDTO>();
+    public IEnumerable<StageStatusDTO> statuses { get; set; } = new List<StageStatusDTO>();
+
+    // Get the current user
+    private async Task<AuthenticationState> GetAuthenticationStateAsync()
+    {
+        var CurrentUser = await _Auth.GetAuthenticationStateAsync();
+        return CurrentUser;
+    }
+
+    // Override the OnAfterSync method
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadPatient();
+            await LoadStagesTypes();
+        }
+    }
+
+    // Load the patient data
+    public async Task LoadPatient()
+    {
+        StateHasChanged();
+        if (PatientID != 0)
+        {
+            patient = await _PatientRepo.GetPatient(PatientID);
+            IsEdit = true;
+        }
+        StateHasChanged();
+    }
+
+
+    // Submit the form
+    public async Task SavePatient()
+    {
+        // Get the current user
+        var authState = await GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity != null)
+        {
+            patient.CreatedBy = user.Identity.Name;
+        }
+        // If the patient is in edit mode
+        if (IsEdit)
+        {
+            await _PatientRepo.UpdatePatient(patient);
+        }
+        // If the patient is in add mode
+        else
+        {
+            // Patient Status
+            patient.StatusID = 2;
+            await _PatientRepo.CreatePatient(patient);
+
+            // Get the patient ID of the newly created patient
+            var patientId = await _PatientRepo.GetPatientId();
+
+            // create the stages for the patient
+            foreach (var stageType in stageTypes)
+            {
+                // switch stage status based on stage order
+                var stageStatus = 0;
+                switch (stageType.Order)
+                {
+                    case 1:
+                        stageStatus = 2;
+                        break;
+                    case 2:
+                        stageStatus = 1;
+                        break;
+                    case 3:
+                        stageStatus = 8;
+                        break;
+                    case 4:
+                        stageStatus = 8;
+                        break;
+                    case 5:
+                        stageStatus = 8;
+                        break;
+                    default:
+                        stageStatus = 8;
+                        break;
+                }
+                var stageColor = statuses?.FirstOrDefault(s => s.ID == stageStatus)?.Color;
+                var stageIcon = statuses?.FirstOrDefault(s => s.ID == stageStatus)?.Icon;
+
+
+                StageDTO stage = new StageDTO
+                    {
+                        Patient_Id = patientId,
+                        StageName = stageType.Name,
+                        StageStatusID = stageStatus,
+                        StageNumber = stageType.Order,
+                        StageGroup = stageType.Group,
+                        StageOrder = stageType.Order,
+                        StageIcon = stageIcon,
+                        StageColor = stageColor,
+                        Description = stageType.Description,
+                        StageStatus = statuses?.FirstOrDefault(s => s.ID == stageStatus)?.Status,
+                        StageGroupParent = stageType.Parent,
+                        Responsible = stageType.Responsible,
+                        AssignedTo = stageType.AssignedTo,
+                        AssignedBy = stageType.AssignedBy,
+                        ActualAssignee = "",
+                        AssignedDate = DateTime.Now,
+                        StartDate = DateTime.Now,
+                        ActualStartDate = DateTime.Now,
+                        DueDate = DateTime.Now.AddDays(stageType.Duration),
+                        CompletionDate = DateTime.Now.AddDays(stageType.Duration),
+                        IsStarted = (stageType.Order == 1),
+                        IsAssigned = (stageType.Order == 1),
+                        IsCurrentStage = (stageType.Order == 1),
+                        IsNextStage = (stageType.Order == 2),
+                        Notes = "",
+                        CreatedBy = user.Identity.Name,
+                        CreatedDate = DateTime.Now,
+
+                    };
+                await _StageRepo.CreateStage(stage, patientId);
+            }
+        }
+        //Notify the user
+        _Notify.Notify(NotificationSeverity.Success, "Success", "Patient Saved Successfully");
+
+        // Navigate to Patient Page
+        _navigationManager.NavigateTo("/patients");
+    }
+
+    // Load all stage types
+    public async Task LoadStagesTypes()
+    {
+        StateHasChanged();
+        stageTypes = await _StageRepo.GetStageTypes();
+        statuses = await _StatusRepo.GetStatuses();
+        StateHasChanged();
+    }
+
+}

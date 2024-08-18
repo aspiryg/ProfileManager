@@ -1,0 +1,296 @@
+﻿@page "/patientStages/{Id:int}"
+
+@using PM_Models.PatientModels
+@using PM_Models.StageModels
+@using PM_Server.Business.Repositories.IRepo
+
+@inject IStageRepo _stageRepo
+@inject IPatientRepo _patientRepo
+@inject IStatusRepo _statusRepo
+@inject IJSRuntime _jsRuntime
+@inject NavigationManager _navManager
+
+
+<PageTitle>Patient Stages</PageTitle>
+
+@*Stages Progress Par*@
+
+
+<MudAlert Severity="MudBlazor.Severity.Success">
+    <MudText Align="Align.Left" Color="Color.Success" Typo="Typo.body2" GutterBottom="true">Patient Progress</MudText>
+</MudAlert>
+<div class="w-100">
+    <div class="progress">
+        <div class="progress-bar" role="progressbar" style="width: @PatientProgress.ToString("p")" aria-valuenow="@PatientProgress" aria-valuemin="0" aria-valuemax="100">@PatientProgress.ToString("P")</div>
+    </div>
+</div>
+<br />
+
+@*Card with image of the patient and table to display the patient information*@
+<MudGrid>
+    <MudItem xs="12" sm="12" md="8" lg="8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title d-inline-block">Patient Information</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <tr>
+                        <th>Patient Name</th>
+                        <td>@($"{patient.FirstName} {patient.MiddleName} {patient.LastName}")</td>
+                    </tr>
+                    <tr>
+                        <th>Current Stage</th>
+                        <td>@CurrentStage?.StageName</td>
+                    </tr>
+                    <tr>
+                        <th>Status</th>
+                        <td>@CurrentStatus?.Status</td>
+                    </tr>
+                    <tr>
+                        <th>Next Stage</th>
+                        <td>@NextStage?.StageName</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <br />
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title d-inline-block">Patient Stages</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-around">
+                    <div class="me-5">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Stage</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                    <th>Start Date</th>
+                                    <th>DueDate</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var stage in stages)
+                                {
+                                    <tr>
+                                        <td>@stage.StageName</td>
+                                        <td>@stage.Description</td>
+                                        <td>
+                                            <MudText Typo="Typo.body2" Color="SetStatusColor(stage.StageStatusID)">@stage.GetStageStatus(stage.StageStatusID)</MudText>
+                                        </td>
+                                        <td>@stage.StartDate.ToString("M")</td>
+                                        <td>@stage.DueDate.ToString("M")</td>
+                                        <td>
+                                            @*Go Right to check the Stage*@
+                                            @if (stage.StageOrder == 2)
+                                            {
+                                                <MudIconButton Color="SetStatusColor(stage.StageStatusID)" Size="Size.Medium" Icon="@Icons.Material.Filled.ArrowCircleRight" aria-label="Check Stage" OnClick='()=>_navManager.NavigateTo($"/socioeconomic/create/{Id}")'></MudIconButton>
+                                            }
+                                            else
+                                            {
+                                                <MudIconButton Size="Size.Medium" Icon="@Icons.Material.Filled.ArrowCircleRight" aria-label="Check Stage"></MudIconButton>
+                                            }
+
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </MudItem>
+    <MudItem xs="12" sm="12" md="4" lg="4">
+        <div>
+            <div class="m-auto">
+                <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Left">
+                    @foreach (var stage in stages)
+                    {
+                        @*1	Pending		Warning	Pending
+                    2	In Progress		Primary	InProgress
+                    3	Completed		Success	Completed
+                    4	Cancelled		Error	Cancelled
+                    5	Rejected		Error	Rejected
+                    6	Approved		Success	Approved
+                    7	On Hold		Warning	OnHold
+                    8	Not Started		Default	NotStarted
+                    9	Not Applicable		Default	NotApplicable
+                    10	Not Required		Default	NotRequired
+                    11	Not Available		Default	NotAvailable *@
+
+                        <MudTimelineItem Color="SetStatusColor(stage.StageStatusID)" Size="Size.Small" Variant="MudBlazor.Variant.Outlined">
+                            <ItemContent>
+
+                                <MudAlert Severity="SetStatusSeverity(stage.StageStatusID)">
+                                    <MudText Align="Align.Left" Color="SetStatusColor(stage.StageStatusID)" Typo="Typo.body2" GutterBottom="true">@stage.StageName</MudText>
+                                    <MudText Align="Align.Left" Typo="Typo.body2">@stage?.GetStageStatus(stage.StageStatusID)</MudText>
+                                </MudAlert>
+                            </ItemContent>
+                            <ItemOpposite>
+                                <MudText Color="SetStatusColor(stage.StageStatusID)">@stage.DueDate.ToShortDateString()</MudText>
+                            </ItemOpposite>
+                        </MudTimelineItem>
+                    }
+                </MudTimeline>
+            </div>
+        </div>
+    </MudItem>
+</MudGrid>
+
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private PatientDTO patient = new PatientDTO();
+
+    private IEnumerable<StageDTO> stages = new List<StageDTO>();
+    public IEnumerable<StageStatusDTO> statuses { get; set; } = new List<StageStatusDTO>();
+
+    public StageDTO CurrentStage { get; set; } = new StageDTO();
+    public StageDTO NextStage { get; set; } = new StageDTO();
+    public StageStatusDTO CurrentStatus { get; set; } = new StageStatusDTO();
+
+    // Status Parameters
+    public MudBlazor.Color statusColor { get; set; }
+    public MudBlazor.Severity severity { get; set; }
+    public string statusIcon { get; set; } = Icons.Material.Filled.NoAccounts;
+
+    // Method to Manipulate the status parameters
+
+    public MudBlazor.Color SetStatusColor(int statusID)
+    {
+        statusColor = statusID switch
+        {
+            1 => MudBlazor.Color.Warning,
+            2 => MudBlazor.Color.Success,
+            3 => MudBlazor.Color.Success,
+            4 => MudBlazor.Color.Error,
+            5 => MudBlazor.Color.Error,
+            6 => MudBlazor.Color.Success,
+            7 => MudBlazor.Color.Warning,
+            8 => MudBlazor.Color.Default,
+            9 => MudBlazor.Color.Default,
+            10 => MudBlazor.Color.Default,
+            11 => MudBlazor.Color.Default,
+            _ => MudBlazor.Color.Default
+        };
+        return statusColor;
+    }
+
+    public MudBlazor.Severity SetStatusSeverity(int statusID)
+    {
+        severity = statusID switch
+        {
+            1 => MudBlazor.Severity.Warning,
+            2 => MudBlazor.Severity.Success,
+            3 => MudBlazor.Severity.Success,
+            4 => MudBlazor.Severity.Error,
+            5 => MudBlazor.Severity.Error,
+            6 => MudBlazor.Severity.Success,
+            7 => MudBlazor.Severity.Warning,
+            8 => MudBlazor.Severity.Normal,
+            9 => MudBlazor.Severity.Normal,
+            10 => MudBlazor.Severity.Normal,
+            11 => MudBlazor.Severity.Normal,
+            _ => MudBlazor.Severity.Normal
+        };
+        return severity;
+    }
+
+    public string SetStatusIcon(int statusID)
+    {
+        statusIcon = statusID switch
+        {
+            1 => Icons.Material.Filled.LockClock,
+            2 => Icons.Material.Filled.Approval,
+            3 => Icons.Material.Filled.Approval,
+            4 => Icons.Material.Filled.RemoveCircle,
+            5 => Icons.Material.Filled.Remove,
+            6 => Icons.Material.Filled.Approval,
+            7 => Icons.Material.Filled.Pending,
+            8 => Icons.Material.Filled.NotStarted,
+            9 => Icons.Material.Filled.NoAccounts,
+            10 => Icons.Material.Filled.NoAccounts,
+            11 => Icons.Material.Filled.NoAccounts,
+            _ => Icons.Material.Filled.NoAccounts
+        };
+        return statusIcon;
+    }
+
+
+
+    // Override OnAfterRenderAsync to load the stages
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadPatient();
+            await LoadStages();
+            await LoadInformation();
+            await LoadStatuses();
+            await CalculateProgress();
+        }
+    }
+
+    // Load the patient method
+    private async Task LoadPatient()
+    {
+        patient = await _patientRepo.GetPatient(Id);
+        StateHasChanged();
+    }
+
+    // Load the stages method
+    private async Task LoadStages()
+    {
+        stages = await _patientRepo.GetPatientStages(Id);
+        StateHasChanged();
+    }
+
+    // Load patient information
+    private async Task LoadInformation()
+    {
+        // Load Current stage
+        var currentStage = await _patientRepo.GetCurrentStage(Id);
+        CurrentStage = currentStage;
+
+        // Load Current Status
+        var currentStatus = await _patientRepo.GetPatientStatus(Id);
+        CurrentStatus = currentStatus;
+
+        // Load Next Stage
+        var nextStage = await _patientRepo.GetNextStage(Id);
+        NextStage = nextStage;
+        StateHasChanged();
+    }
+
+
+    // Load All status
+    private async Task LoadStatuses()
+    {
+        statuses = await _statusRepo.GetStatuses();
+        StateHasChanged();
+    }
+
+    // Make the progress a percentage
+    public decimal PatientProgress { get; set; }
+    // Calculate the progress of the patient
+
+    private async Task CalculateProgress()
+    {
+        var totalStages = stages.Count();
+        var thisStageNumber = stages.Where(s => s.IsCurrentStage).First().StageNumber;
+        PatientProgress = (decimal)thisStageNumber / totalStages;
+        StateHasChanged();
+    }
+
+}

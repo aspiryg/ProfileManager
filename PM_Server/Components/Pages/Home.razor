@@ -1,0 +1,23 @@
+﻿@page "/"
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello User!</h1>
+
+Welcome to the Patient Portal.
+
+@*Manage Signing in or create an account*@
+<AuthorizeView>
+    <Authorized>
+        <p>Hello, @context.User.Identity?.Name!</p>
+    </Authorized>
+    <NotAuthorized>
+        @*if you have an account login to your account or register*@
+        <p>
+            <NavLink class="link-primary" href="account/login">Log in</NavLink> to access your account.
+        </p>
+        <p>
+            <NavLink class="link-danger" href="account/register">Register</NavLink> if you don't have an account.
+        </p>
+    </NotAuthorized>
+</AuthorizeView>

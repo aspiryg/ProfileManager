@@ -1,0 +1,131 @@
+﻿@page "/patients"
+@using PM_Models.PatientModels
+@using PM_Models.StageModels
+@using PM_Server.Business.Repositories
+@using PM_Server.Business.Repositories.IRepo
+@using MudBlazor.Services
+
+@inject IPatientRepo _patientRepo
+@inject IStageRepo _stageRepo
+@inject IStatusRepo _statusRepo
+@inject NavigationManager _navManager
+@inject IJSRuntime _jsRuntime
+@inject NotificationService NotificationService
+
+<PageTitle>Patients</PageTitle>
+
+<div class="top-row px-4">
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between">
+        <h5 class="card-title d-inline-block">Patients</h5>
+        <RadzenButton Icon="add" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Medium" class="rz-border-radius-2" Click='()=>_navManager.NavigateTo("/patients/create")'>Add Patient</RadzenButton>
+    </div>
+    <div class="card-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Code</th>
+                    <th>Current Stage</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var patient in patients)
+                {
+                    <tr>
+                        @*Full Name*@
+                        <td>@($"{patient.FirstName} {patient.MiddleName} {patient.LastName}")</td>
+                        <td>@patient.PatientCode</td>
+
+                        <td>
+                            @if (GetStatus(patient.StatusID).Status != string.Empty && GetStatus(patient.StatusID) != null)
+                            {
+                                <span>@GetStatus(patient.StatusID).Status</span>
+                            }
+                            else
+                            {
+                                <span>No Status</span>
+                            }
+                        </td>
+                        <td>
+                            @*Edit Patient*@
+                            <RadzenButton Icon="edit" Click='@(()=>_navManager.NavigateTo($"/patients/edit/{patient.PatientID}"))' ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.ExtraSmall" class="rz-border-radius-10" />
+                            @*View Patient Details*@
+                            <RadzenButton Icon="visibility" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.ExtraSmall" class="rz-border-radius-10" />
+                            @*List of stages*@
+                            <RadzenButton Icon="list" Click='@(()=>_navManager.NavigateTo($"/patientStages/{patient.PatientID}"))' ButtonStyle="ButtonStyle.Warning" Size="ButtonSize.ExtraSmall" class="rz-border-radius-10" />
+                            @*Delete Patient*@
+                            <RadzenButton Click=@(()=>DeletePatient(patient.PatientID)) Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" class="rz-border-radius-10" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    // The PatientsList
+    public IEnumerable<PatientDTO> patients { get; set; } = new List<PatientDTO>();
+    // Stage List
+    public IEnumerable<StageDTO> stages { get; set; } = new List<StageDTO>();
+    // Status List
+    public IEnumerable<StageStatusDTO> statuses { get; set; } = new List<StageStatusDTO>();
+
+    private void OnClick(string text)
+    {
+        NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Info, Summary = "Button Clicked", Detail = text });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadPatients();
+        }
+    }
+
+    private async Task LoadPatients()
+    {
+        StateHasChanged();
+        patients = await _patientRepo.GetAllPatients();
+        stages = await _stageRepo.GetStages();
+        statuses = await _statusRepo.GetStatuses();
+        StateHasChanged();
+    }
+
+    //Get The Patient Current Stage
+    private async Task<StageDTO> GetCurrentStage(int patientID)
+    {
+        var CurrentStage = await _patientRepo.GetCurrentStage(patientID);
+        return CurrentStage;
+    }
+
+    //Get The Patient Status
+    private StageStatusDTO GetStatus(int statusID)
+    {
+        var status = statuses.FirstOrDefault(s => s.ID == statusID);
+        if (status != null)
+        {
+            return status;
+        }
+        else
+        {
+            return new StageStatusDTO();
+        }
+    }
+
+    // Delete Patient
+    private async Task DeletePatient(int patientID)
+    {
+        var confirm = await _jsRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this patient?");
+        if (confirm)
+        {
+            await _patientRepo.DeletePatient(patientID);
+            await LoadPatients();
+        }
+    }
+}
